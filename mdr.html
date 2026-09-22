@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kokona MDReader</title>
+<style>
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+                     'Microsoft YaHei', Helvetica, Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px 20px 60px;
+        line-height: 1.75;
+        color: #24292e;
+        background: #fff;
+        font-size: 16px;
+        word-wrap: break-word;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        margin: 28px 0 16px;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    h1 { font-size: 2em;    border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    h2 { font-size: 1.5em;  border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    h3 { font-size: 1.25em; }
+    h4 { font-size: 1.1em;  }
+    h5 { font-size: 1em;    }
+    h6 { font-size: 0.9em;  color: #6a737d; }
+
+    p { margin: 0 0 16px; }
+    p:last-child { margin-bottom: 0; }
+
+    ul, ol { margin: 0 0 16px; padding-left: 2em; }
+    li { margin-bottom: 4px; }
+    li > ul, li > ol { margin-top: 4px; margin-bottom: 0; }
+
+    blockquote {
+        margin: 0 0 16px;
+        padding: 0 1em;
+        color: #6a737d;
+        border-left: 0.25em solid #dfe2e5;
+    }
+    blockquote > :last-child { margin-bottom: 0; }
+
+    code {
+        padding: 0.2em 0.4em;
+        font-size: 85%;
+        background: rgba(27, 31, 35, 0.06);
+        border-radius: 4px;
+        font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    pre {
+        margin: 0 0 16px;
+        padding: 16px;
+        overflow: auto;
+        font-size: 85%;
+        line-height: 1.5;
+        background: #f6f8fa;
+        border-radius: 6px;
+    }
+    pre code {
+        padding: 0;
+        font-size: 100%;
+        background: transparent;
+        border-radius: 0;
+    }
+
+    a { color: #0366d6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    hr {
+        height: 2px;
+        margin: 28px 0;
+        background: #e1e4e8;
+        border: 0;
+    }
+
+    table {
+        display: block;
+        width: 100%;
+        overflow: auto;
+        margin: 0 0 16px;
+        border-collapse: collapse;
+    }
+    table th, table td {
+        padding: 6px 13px;
+        border: 1px solid #dfe2e5;
+    }
+    table th { font-weight: 600; background: #f6f8fa; }
+    table tr { background: #fff; }
+    table tr:nth-child(2n) { background: #f6f8fa; }
+
+    img { max-width: 100%; height: auto; }
+
+    del { text-decoration: line-through; color: #6a737d; }
+
+    .file-info {
+        background: #f0f7ff;
+        border-left: 4px solid #4dabf7;
+        padding: 12px 16px;
+        margin: 0 0 24px;
+        border-radius: 4px;
+        font-size: 14px;
+        color: #1a3a5c;
+    }
+    .error {
+        color: #d32f2f;
+        background: #ffebee;
+        padding: 20px 24px;
+        border-radius: 6px;
+        border-left: 4px solid #d32f2f;
+        margin: 20px 0;
+    }
+    .error h3 { margin-top: 0; color: #b71c1c; }
+    .error code {
+        background: rgba(211, 47, 47, 0.1);
+        color: #b71c1c;
+        word-break: break-all;
+    }
+</style>
+</head>
+<body>
+<div id="content">Loading...</div>
+
+<script>
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function parseInline(text) {
+        if (!text) return '';
+        text = escapeHtml(text);
+
+        text = text.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+        text = text.replace(
+            /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
+            function (_, alt, src, title) {
+                return '<img src="' + src + '" alt="' + alt + '"' +
+                       (title ? ' title="' + title + '"' : '') + '>';
+            }
+        );
+
+        text = text.replace(
+            /\[([^\]]+)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g,
+            function (_, txt, href, title) {
+                return '<a href="' + href + '" target="_blank" rel="noopener"' +
+                       (title ? ' title="' + title + '"' : '') + '>' + txt + '</a>';
+            }
+        );
+
+        text = text.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+        text = text.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+
+        text = text.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+        text = text.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+
+        text = text.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+
+        text = text.replace(/ {2,}$/g, '<br>');
+
+        return text;
+    }
+
+    function isTableSeparator(line) {
+        if (!line) return false;
+        const t = line.trim();
+        if (t.indexOf('|') === -1) return false;
+        if (t.indexOf('-') === -1) return false;
+        return /^[\|\s:\-]+$/.test(t);
+    }
+
+    function splitTableRow(line) {
+        let t = line.trim();
+        if (t.charAt(0) === '|') t = t.slice(1);
+        if (t.charAt(t.length - 1) === '|') t = t.slice(0, -1);
+        return t.split('|').map(function (c) { return c.trim(); });
+    }
+
+    function parseTableAlign(line) {
+        return splitTableRow(line).map(function (cell) {
+            const left  = cell.charAt(0) === ':';
+            const right = cell.charAt(cell.length - 1) === ':';
+            if (left && right) return 'center';
+            if (right) return 'right';
+            return 'left';
+        });
+    }
+
+    function parseMarkdown(input) {
+        if (!input) return '';
+        input = String(input).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = input.split('\n');
+        const out = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            if (trimmed === '') { i++; continue; }
+
+            if (/^```/.test(trimmed)) {
+                const lang = trimmed.replace(/^```/, '').trim();
+                const codeLines = [];
+                i++;
+                while (i < lines.length && !/^```/.test(lines[i].trim())) {
+                    codeLines.push(lines[i]);
+                    i++;
+                }
+                if (i < lines.length) i++;
+                const codeHtml = escapeHtml(codeLines.join('\n'));
+                out.push('<pre><code' +
+                         (lang ? ' class="language-' + escapeHtml(lang) + '"' : '') +
+                         '>' + codeHtml + '</code></pre>');
+                continue;
+            }
+
+            if (/^(?:-{3,}|_{3,}|\*{3,})\s*$/.test(trimmed)) {
+                out.push('<hr>');
+                i++;
+                continue;
+            }
+
+            const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+            if (headingMatch) {
+                const level = headingMatch[1].length;
+                out.push('<h' + level + '>' + parseInline(headingMatch[2]) + '</h' + level + '>');
+                i++;
+                continue;
+            }
+
+            if (line.indexOf('|') !== -1 &&
+                i + 1 < lines.length &&
+                isTableSeparator(lines[i + 1])) {
+                const headerCells = splitTableRow(line);
+                const aligns = parseTableAlign(lines[i + 1]);
+                i += 2;
+                const rows = [];
+                while (i < lines.length && lines[i].indexOf('|') !== -1 &&
+                       lines[i].trim() !== '') {
+                    rows.push(splitTableRow(lines[i]));
+                    i++;
+                }
+                let t = '<table>\n<thead>\n<tr>\n';
+                headerCells.forEach(function (cell, idx) {
+                    t += '<th style="text-align:' + (aligns[idx] || 'left') + '">' +
+                         parseInline(cell) + '</th>\n';
+                });
+                t += '</tr>\n</thead>\n<tbody>\n';
+                rows.forEach(function (row) {
+                    t += '<tr>\n';
+                    row.forEach(function (cell, idx) {
+                        t += '<td style="text-align:' + (aligns[idx] || 'left') + '">' +
+                             parseInline(cell) + '</td>\n';
+                    });
+                    t += '</tr>\n';
+                });
+                t += '</tbody>\n</table>';
+                out.push(t);
+                continue;
+            }
+
+            if (/^>\s?/.test(line)) {
+                const quoteLines = [];
+                while (i < lines.length && /^>\s?/.test(lines[i])) {
+                    quoteLines.push(lines[i].replace(/^>\s?/, ''));
+                    i++;
+                }
+                out.push('<blockquote>' + parseMarkdown(quoteLines.join('\n')) + '</blockquote>');
+                continue;
+            }
+
+            if (/^[-*+]\s+/.test(line)) {
+                const items = [];
+                while (i < lines.length && /^[-*+]\s+/.test(lines[i])) {
+                    const content = lines[i].replace(/^[-*+]\s+/, '');
+                    items.push('<li>' + parseInline(content) + '</li>');
+                    i++;
+                }
+                out.push('<ul>\n' + items.join('\n') + '\n</ul>');
+                continue;
+            }
+
+            if (/^\d+\.\s+/.test(line)) {
+                const items = [];
+                while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+                    const content = lines[i].replace(/^\d+\.\s+/, '');
+                    items.push('<li>' + parseInline(content) + '</li>');
+                    i++;
+                }
+                out.push('<ol>\n' + items.join('\n') + '\n</ol>');
+                continue;
+            }
+
+            const paraLines = [];
+            while (i < lines.length) {
+                const cur = lines[i];
+                const curTrim = cur.trim();
+                if (curTrim === '') break;
+                if (/^```/.test(curTrim)) break;
+                if (/^#{1,6}\s+/.test(cur)) break;
+                if (/^>\s?/.test(cur)) break;
+                if (/^[-*+]\s+/.test(cur)) break;
+                if (/^\d+\.\s+/.test(cur)) break;
+                if (/^(?:-{3,}|_{3,}|\*{3,})\s*$/.test(curTrim)) break;
+                if (i + 1 < lines.length && cur.indexOf('|') !== -1 &&
+                    isTableSeparator(lines[i + 1])) break;
+                paraLines.push(cur);
+                i++;
+            }
+            if (paraLines.length === 0) { i++; continue; }
+
+            const paraHtml = paraLines
+                .map(function (l) { return parseInline(l); })
+                .join('\n');
+            out.push('<p>' + paraHtml + '</p>');
+        }
+
+        return out.join('\n');
+    }
+
+    function getFileFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const fileParam = params.get('file');
+        if (!fileParam) return '/md/sample.md';
+
+        let p = fileParam.trim();
+        if (!/\.md$/i.test(p)) p += '.md';
+        if (p.charAt(0) === '/') p = p.slice(1);
+        return p;
+    }
+
+    function getTitleFromFilename(filename) {
+        const base = filename.split('/').pop();
+        return base.replace(/\.md$/i, '') || 'Untitled';
+    }
+
+    function loadMarkdownFile() {
+        const filename = getFileFromURL();
+        const title = getTitleFromFilename(filename);
+        document.title = title;
+
+        const contentDiv = document.getElementById('content');
+        contentDiv.innerHTML =
+            '<div class="file-info">正在读取: <strong>' + escapeHtml(filename) + '</strong></div>';
+
+        const requestUrl = filename + '?_=' + Date.now();
+
+        fetch(requestUrl, { cache: 'no-store' })
+            .then(function (r) {
+                if (!r.ok) {
+                    if (r.status === 404) throw new Error('文件未找到: ' + filename);
+                    throw new Error('HTTP ' + r.status + ': ' + r.statusText);
+                }
+                return r.text();
+            })
+            .then(function (text) {
+                let html = '<div class="file-info">文件: <strong>' +
+                           escapeHtml(filename) + '</strong></div>';
+                if (text.trim() === '') {
+                    html += '<p><em>（文件内容为空）</em></p>';
+                } else {
+                    html += parseMarkdown(text);
+                }
+                contentDiv.innerHTML = html;
+            })
+            .catch(function (err) {
+                contentDiv.innerHTML =
+                    '<div class="error">' +
+                        '<h3>无法加载文件</h3>' +
+                        '<p><strong>文件:</strong> ' + escapeHtml(filename) + '</p>' +
+                        '<p><strong>错误信息:</strong> ' + escapeHtml(err.message || String(err)) + '</p>' +
+                        '<p>您可以：</p>' +
+                        '<ul>' +
+                            '<li>检查网络状态</li>' +
+                            '<li>回到主页面重新选择</li>' +
+                            '<li>联系管理员</li>' +
+                        '</ul>' +
+                        '<p>示例 URL：</p>' +
+                        '<ul><li><code>' +
+                            escapeHtml(window.location.origin + window.location.pathname) +
+                            '?file=/md/sample.md</code></li></ul>' +
+                    '</div>';
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadMarkdownFile);
+</script>
+</body>
+</html>
